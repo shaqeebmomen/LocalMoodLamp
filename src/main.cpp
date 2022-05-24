@@ -1,21 +1,25 @@
 /**
  * LocalMoodLamp/main.cpp
- * 
- * Main file for LocalMoodLamp Code. 
- *  Basic lamp that accepts downloadable animations from a desktop app over serial 
- *  
+ *
+ * Main file for LocalMoodLamp Code.
+ *  Basic lamp that accepts downloadable animations from a desktop app over serial
+ *
  * Author: Shaqeeb Momen
  * Date: December 27, 2021
  */
 
 #include <Arduino.h>
 
+#if defined(MICRO) || defined(NANO)
 #include <EEPROM.h>
+#else
+#include <extEEPROM.hpp>
+#endif
 #include <Adafruit_NeoPixel.h>
 #include <AnimationDriver.h>
 #include <DefaultAnimations.h>
 
-// #define WRITE_EEPROM
+// #define WRITE_EEPROM // Flag to write defaults to EEPROM (effectively reset EEPROM)
 
 // DEBUG FLAGS
 // #define DEBUG
@@ -24,7 +28,6 @@
 // #define DEBUG_EEPROM_SERIAL
 
 // Routine enable flags
-#define EN_MOTOR
 #define EN_ANIMATION
 
 // Hardware defs
@@ -42,6 +45,13 @@
 #define BTN_DWN_PIN 4
 #endif
 
+#ifdef XIAO
+#define POT_PIN A3    // D3
+#define PIXEL_PIN 10  // D10
+#define BTN_UP_PIN 9  // D9
+#define BTN_DWN_PIN 8 // D8
+#endif
+
 // Numerical Constants
 // #define T_LOOP 0     // Execution loop time
 // Serial Constants
@@ -50,6 +60,10 @@
 #define META_SIZE 2
 #define POT_THRES 20
 #define BTN_TIME 200
+
+#ifdef XIAO
+extEEPROM EEPROM(0b1010000, 8192, 32, 256);
+#endif
 
 // unsigned long loopTimer;
 Adafruit_NeoPixel strip(NUM_LEDS, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
@@ -93,7 +107,11 @@ void EEPROM_Load(uint8_t index)
   Serial.print(" Addr: ");
   Serial.println((int)(index * sizeof(currentAnim)));
 #endif
-  EEPROM.get((int)(index * sizeof(AnimationDriver::animation)), currentAnim);
+#ifdef XIAO
+  EEPROM.get((uint32_t)(index * sizeof(AnimationDriver::animation)), &currentAnim, sizeof(AnimationDriver::animation));
+#else
+  EEPROM.get((int)(index * sizeof(AnimationDriver::animation)), &currentAnim);
+#endif
 #ifdef DEBUG_EEPROM
   Serial.println(currentAnim.frameCount);
   Serial.println("Animation Loaded");
@@ -117,7 +135,11 @@ void EEPROM_WriteDefaults()
     Serial.print("Writing To: ");
     Serial.println((int)(i * sizeof(animBuff)));
 #endif
-    EEPROM.put((int)(i * sizeof(AnimationDriver::animation)), animBuff);
+#ifdef XIAO
+    EEPROM.put((uint32_t)(i * sizeof(AnimationDriver::animation)), &animBuff, sizeof(AnimationDriver::animation));
+#else
+    EEPROM.put((int)(i * sizeof(AnimationDriver::animation)), &animBuff);
+#endif
   }
   Serial.println("DEFAULTS WRITTEN TO EEPROM");
   Serial.flush();
@@ -137,13 +159,17 @@ void saveAnimationFromSerial(byte *buff)
     _a.frames[i].color[0] = buff[baseIndex];                                                                                                                            // Red
     _a.frames[i].color[1] = buff[baseIndex + 1];                                                                                                                        // Green
     _a.frames[i].color[2] = buff[baseIndex + 2];                                                                                                                        // Blue
-    _a.frames[i].time = (uint32_t)buff[baseIndex + 3] << 24 | (uint32_t)buff[baseIndex + 4] << 16 | (uint32_t)buff[baseIndex + 5] << 8 | (uint32_t)buff[baseIndex + 6]; //time
+    _a.frames[i].time = (uint32_t)buff[baseIndex + 3] << 24 | (uint32_t)buff[baseIndex + 4] << 16 | (uint32_t)buff[baseIndex + 5] << 8 | (uint32_t)buff[baseIndex + 6]; // time
     if (i == buff[1] - 1)
     {
       _a.time = _a.frames[i].time;
     }
   }
+#ifdef XIAO
+  EEPROM.put((buff[0] * sizeof(AnimationDriver::animation)), &_a, sizeof(AnimationDriver::animation));
+#else
   EEPROM.put(buff[0] * sizeof(AnimationDriver::animation), _a);
+#endif
 }
 
 // Waits for acknowledge byte (0xff) from pc
@@ -189,7 +215,11 @@ void handleUploadRequest()
   // Wait for first 2 bytes to come in
   while (Serial.available() < META_SIZE)
     ;
+#ifdef XIAO
+  Serial.readBytes((char *)localBuff, META_SIZE);
+#else
   Serial.readBytes(localBuff, META_SIZE);
+#endif
 
   // While the pc is sending data, store it in the buffer
   // Loop untill all bytes expected are read
@@ -236,7 +266,11 @@ void handleDownloadRequest()
   for (uint8_t i = 0; i < 6; i++)
   {
     AnimationDriver::animation _a;
+#ifdef XIAO
+    EEPROM.get((i * sizeof(AnimationDriver::animation)), &_a, sizeof(AnimationDriver::animation));
+#else
     EEPROM.get(i * sizeof(AnimationDriver::animation), _a);
+#endif
     // Write the frame count
     if (!waitForAck(1000))
     {
@@ -313,7 +347,11 @@ void handleSerial()
 void EEPROM_Dump_Anim(uint8_t index)
 {
   AnimationDriver::animation _anim;
+#ifdef XIAO
+  EEPROM.get((uint32_t)(index * sizeof(AnimationDriver::animation)), &_anim, sizeof(AnimationDriver::animation));
+#else
   EEPROM.get(index * sizeof(AnimationDriver::animation), _anim);
+#endif
   Serial.print(F("Animation at Index "));
   Serial.println(index);
   Serial.print(F("Frame Count: "));
@@ -336,10 +374,9 @@ void EEPROM_Dump_Anim(uint8_t index)
   }
 }
 #endif
-
 uint16_t buttonFSM()
 {
-  typedef enum state
+  enum state
   {
     IDLE,
     TRIGGERED,
@@ -411,6 +448,14 @@ void setup()
   // Initial Brightness
   LEDscale = analogRead(POT_PIN);
   strip.setBrightness(LEDscale / 4);
+
+#ifdef XIAO
+  EEPROM.init();
+#endif
+
+#ifdef WRITE_EEPROM
+  EEPROM_WriteDefaults();
+#endif
   // Animation Controller
   EEPROM_Load(0);
   animator.updateAnimation(currentAnim);
@@ -419,10 +464,6 @@ void setup()
   // Button Setup
   pinMode(BTN_DWN_PIN, INPUT_PULLUP);
   pinMode(BTN_UP_PIN, INPUT_PULLUP);
-
-#ifdef WRITE_EEPROM
-  EEPROM_WriteDefaults();
-#endif
 
 #ifdef DEBUG_EEPROM_SERIAL
   for (uint8_t i = 0; i < 6; i++)
@@ -471,8 +512,7 @@ void loop()
     animator.run([](uint8_t r, uint8_t g, uint8_t b)
                  {
                    strip.fill(strip.Color(r, g, b));
-                   strip.show();
-                 });
+                   strip.show(); });
 #endif
   }
 
