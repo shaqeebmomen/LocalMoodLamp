@@ -183,7 +183,7 @@ bool waitForAck(uint32_t timeout)
     // Check for Serial data or
     if (Serial.available() > 0)
     {
-      uint8_t ack = (byte)Serial.read();
+      uint8_t ack = (uint8_t)Serial.read();
       if (ack == 0xff)
       {
         // Success
