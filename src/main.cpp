@@ -19,7 +19,7 @@
 #include <AnimationDriver.h>
 #include <DefaultAnimations.h>
 
-#define WRITE_EEPROM // Flag to write defaults to EEPROM (effectively reset EEPROM)
+// #define WRITE_EEPROM // Flag to write defaults to EEPROM (effectively reset EEPROM)
 
 // DEBUG FLAGS
 // #define DEBUG
