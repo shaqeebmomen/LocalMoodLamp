@@ -19,7 +19,7 @@
 #include <AnimationDriver.h>
 #include <DefaultAnimations.h>
 
-// #define WRITE_EEPROM // Flag to write defaults to EEPROM (effectively reset EEPROM)
+#define WRITE_EEPROM // Flag to write defaults to EEPROM (effectively reset EEPROM)
 
 // DEBUG FLAGS
 // #define DEBUG
@@ -62,7 +62,8 @@
 #define BTN_TIME 200
 
 #ifdef XIAO
-extEEPROM EEPROM(0b1010000, 8192, 32, 256);
+extEEPROM EEPROM(0b1010000, extEEPROM::deviceIDs::ID_24AA16H);
+// extEEPROM EEPROM(0b1010000, extEEPROM::deviceIDs::ID_24FC64F);
 #endif
 
 // unsigned long loopTimer;
@@ -85,7 +86,8 @@ const AnimationDriver::animation defaults[] PROGMEM = {
     Breathe_White,
     Solid_Green,
     Rainbow,
-    Solid_Blue};
+    Solid_Blue
+    };
 
 AnimationDriver::animation currentAnim;
 
@@ -461,9 +463,14 @@ void setup()
   animator.updateAnimation(currentAnim);
   // Initialize timers
   btnTimer = millis();
-  // Button Setup
+// Button Setup
+#ifdef XIAO
+  pinMode(BTN_DWN_PIN, INPUT);
+  pinMode(BTN_UP_PIN, INPUT);
+#else
   pinMode(BTN_DWN_PIN, INPUT_PULLUP);
   pinMode(BTN_UP_PIN, INPUT_PULLUP);
+#endif
 
 #ifdef DEBUG_EEPROM_SERIAL
   for (uint8_t i = 0; i < 6; i++)
@@ -486,7 +493,6 @@ void loop()
     handleSerial();
     EEPROM_Load(currentMode);
     animator.updateAnimation(currentAnim);
-    // resetFunc();
   }
   else
   {
