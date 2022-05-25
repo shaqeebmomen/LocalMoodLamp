@@ -86,8 +86,7 @@ const AnimationDriver::animation defaults[] PROGMEM = {
     Breathe_White,
     Solid_Green,
     Rainbow,
-    Solid_Blue
-    };
+    Solid_Blue};
 
 AnimationDriver::animation currentAnim;
 
@@ -463,14 +462,10 @@ void setup()
   animator.updateAnimation(currentAnim);
   // Initialize timers
   btnTimer = millis();
-// Button Setup
-#ifdef XIAO
-  pinMode(BTN_DWN_PIN, INPUT);
-  pinMode(BTN_UP_PIN, INPUT);
-#else
+  // Button Setup
+
   pinMode(BTN_DWN_PIN, INPUT_PULLUP);
   pinMode(BTN_UP_PIN, INPUT_PULLUP);
-#endif
 
 #ifdef DEBUG_EEPROM_SERIAL
   for (uint8_t i = 0; i < 6; i++)
