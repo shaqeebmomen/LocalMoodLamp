@@ -19,13 +19,14 @@
 #include <AnimationDriver.h>
 #include <DefaultAnimations.h>
 
-// #define WRITE_EEPROM // Flag to write defaults to EEPROM (effectively reset EEPROM)
+//#define WRITE_EEPROM // Flag to write defaults to EEPROM (effectively reset EEPROM)
+// #define SKIP_PIXEL // Skip the first pixel for the 3.3v hack
 
 // DEBUG FLAGS
 // #define DEBUG
 // #define DEBUG_LED
 // #define DEBUG_EEPROM
-// #define DEBUG_EEPROM_SERIAL
+//  #define DEBUG_EEPROM_SERIAL
 
 // Routine enable flags
 #define EN_ANIMATION
@@ -102,7 +103,7 @@ void (*resetFunc)(void) = 0;
 // Load specific animation from eeprom into currentAnim
 void EEPROM_Load(uint8_t index)
 {
-#ifdef DEBUG_EERPROM
+#ifdef DEBUG_EEPROM
   Serial.print("Getting Index: ");
   Serial.print(index);
   Serial.print(" Addr: ");
@@ -111,7 +112,8 @@ void EEPROM_Load(uint8_t index)
 #ifdef XIAO
   EEPROM.get((uint32_t)(index * sizeof(AnimationDriver::animation)), &currentAnim, sizeof(AnimationDriver::animation));
 #else
-  EEPROM.get((int)(index * sizeof(AnimationDriver::animation)), &currentAnim);
+  const AnimationDriver::animation* animPtr = &currentAnim;
+  EEPROM.get((int)(index * sizeof(AnimationDriver::animation)), animPtr);
 #endif
 #ifdef DEBUG_EEPROM
   Serial.println(currentAnim.frameCount);
@@ -480,6 +482,7 @@ void setup()
 
 void loop()
 {
+
   static uint16_t lastMode = 0;
   uint16_t currentMode = 0;
   if (Serial.available() > 0)
@@ -495,6 +498,7 @@ void loop()
     LEDscale = analogRead(POT_PIN) / 4;
     if (abs(LEDscale - prevLEDScale) > POT_THRES)
     {
+      
       strip.setBrightness(LEDscale);
       prevLEDScale = LEDscale;
     }
@@ -512,7 +516,11 @@ void loop()
 #ifdef EN_ANIMATION
     animator.run([](uint8_t r, uint8_t g, uint8_t b)
                  {
-                   strip.fill(strip.Color(r, g, b));
+                   #ifdef SKIP_PIXEL
+                   strip.fill(strip.Color(r, g, b),1,0); // Fill strip, skipping first pixel
+                   #else
+                   strip.fill(strip.Color(r, g, b)); // Fill entire strip
+                   #endif
                    strip.show(); });
 #endif
   }
